@@ -9,7 +9,27 @@ COLORS = {
     "body_highlight": (96, 195, 100),  #坦克车身高亮颜色
     "turret": (60, 60, 60),  #坦克炮塔颜色
     "turret_highlight": (90, 90, 90),  #坦克炮塔高亮颜色
+
+    "brick_wall": (139, 69, 19),  # 砖墙颜色
+    "steel_wall": (128, 128, 128),  # 钢墙颜色
 }
+MAP_DATA = [
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+]
 
 # 初始化 pygame
 pygame.init()
@@ -25,6 +45,14 @@ pygame.display.set_caption("坦克大战")
 # 设置游戏时钟
 clock = pygame.time.Clock()
 
+def draw_map(surface):
+    for row in range(len(MAP_DATA)):
+        for col in range(len(MAP_DATA[row])):
+            if MAP_DATA[row][col] == 1:
+                pygame.draw.rect(surface, COLORS["brick_wall"], (col * 40, row * 40, 40, 40))  # 绘制砖墙
+            elif MAP_DATA[row][col] == 2:
+                pygame.draw.rect(surface, COLORS["steel_wall"], (col * 40, row * 40, 40, 40))  # 绘制钢墙
+
 # 定义坦克类
 class Tank:
     def __init__(self, x, y):
@@ -35,8 +63,8 @@ class Tank:
 
     def draw(self, surface):
         if self.direction == "UP":
-            pygame.draw.rect(surface, COLORS["turret"], (self.rect.left, self.rect.top + 4, 10, 36))
-            pygame.draw.rect(surface, COLORS["turret"], (self.rect.right - 10, self.rect.top + 4, 10, 36))
+            pygame.draw.rect(surface, COLORS["track"], (self.rect.left, self.rect.top + 4, 10, 36))
+            pygame.draw.rect(surface, COLORS["track"], (self.rect.right - 10, self.rect.top + 4, 10, 36))
             for i in range(5, 38, 4):
                 pygame.draw.rect(surface, COLORS["track_line"], (self.rect.left, self.rect.top + i, 10, 2))
                 pygame.draw.rect(surface, COLORS["track_line"], (self.rect.right - 10, self.rect.top + i, 10, 2))
@@ -46,8 +74,8 @@ class Tank:
             pygame.draw.rect(surface, COLORS["turret"], (self.rect.centerx - 5, self.rect.top + 11, 10, 22))
             pygame.draw.rect(surface, COLORS["turret_highlight"], (self.rect.centerx - 3, self.rect.top + 13, 6, 18))
         elif self.direction == "DOWN":
-            pygame.draw.rect(surface, COLORS["turret"], (self.rect.left, self.rect.top, 10, 36))
-            pygame.draw.rect(surface, COLORS["turret"], (self.rect.right - 10, self.rect.top, 10, 36))
+            pygame.draw.rect(surface, COLORS["track"], (self.rect.left, self.rect.top, 10, 36))
+            pygame.draw.rect(surface, COLORS["track"], (self.rect.right - 10, self.rect.top, 10, 36))
             for i in range(1, 34, 4):
                 pygame.draw.rect(surface, COLORS["track_line"], (self.rect.left, self.rect.top + i, 10, 2))
                 pygame.draw.rect(surface, COLORS["track_line"], (self.rect.right - 10, self.rect.top + i, 10, 2))
@@ -57,8 +85,8 @@ class Tank:
             pygame.draw.rect(surface, COLORS["turret"], (self.rect.centerx - 5, self.rect.bottom - 33, 10, 22))
             pygame.draw.rect(surface, COLORS["turret_highlight"], (self.rect.centerx - 3, self.rect.bottom - 31, 6, 18))
         elif self.direction == "LEFT":
-            pygame.draw.rect(surface, COLORS["turret"], (self.rect.left + 4, self.rect.top, 36, 10))
-            pygame.draw.rect(surface, COLORS["turret"], (self.rect.left + 4, self.rect.bottom - 10, 36, 10))
+            pygame.draw.rect(surface, COLORS["track"], (self.rect.left + 4, self.rect.top, 36, 10))
+            pygame.draw.rect(surface, COLORS["track"], (self.rect.left + 4, self.rect.bottom - 10, 36, 10))
             for i in range(5, 38, 4):
                 pygame.draw.rect(surface, COLORS["track_line"], (self.rect.left + i, self.rect.top, 2, 10))
                 pygame.draw.rect(surface, COLORS["track_line"], (self.rect.left + i, self.rect.bottom - 10, 2, 10))
@@ -68,8 +96,8 @@ class Tank:
             pygame.draw.rect(surface, COLORS["turret"], (self.rect.left + 11, self.rect.centery - 5, 22, 10))
             pygame.draw.rect(surface, COLORS["turret_highlight"], (self.rect.left + 13, self.rect.centery - 3, 18, 6))
         elif self.direction == "RIGHT":
-            pygame.draw.rect(surface, COLORS["turret"], (self.rect.left, self.rect.top, 36, 10))
-            pygame.draw.rect(surface, COLORS["turret"], (self.rect.left, self.rect.bottom - 10, 36, 10))
+            pygame.draw.rect(surface, COLORS["track"], (self.rect.left, self.rect.top, 36, 10))
+            pygame.draw.rect(surface, COLORS["track"], (self.rect.left, self.rect.bottom - 10, 36, 10))
             for i in range(1, 34, 4):
                 pygame.draw.rect(surface, COLORS["track_line"], (self.rect.left + i, self.rect.top, 2, 10))
                 pygame.draw.rect(surface, COLORS["track_line"], (self.rect.left + i, self.rect.bottom - 10, 2, 10))
@@ -79,7 +107,7 @@ class Tank:
             pygame.draw.rect(surface, COLORS["turret"], (self.rect.right - 33, self.rect.centery - 5, 22, 10))
             pygame.draw.rect(surface, COLORS["turret_highlight"], (self.rect.right - 31, self.rect.centery - 3, 18, 6))
 
-    def handle_keys(self, key):
+    def tank_move(self, key):
         if key == pygame.K_UP:
             self.direction = "UP"
             self.rect.y -= self.speed
@@ -92,12 +120,14 @@ class Tank:
         elif key == pygame.K_RIGHT:
             self.direction = "RIGHT"
             self.rect.x += self.speed
+        else:
+            pass  # 如果没有按下方向键，则不移动坦克
 
     def clamp_position(self, screen_rect):
         self.rect.clamp_ip(screen_rect)  # 确保坦克不会移出屏幕边界
 
 # 创建一个坦克实例，初始位置在屏幕中心
-tank = Tank(380, 280)
+tank = Tank(360, 280)
 
 # 设置游戏循环状态
 running = True
@@ -122,12 +152,15 @@ while running:
 
     # 更新坦克位置和方向
     first_pressed_key = tank.pressed_order[0] if tank.pressed_order else None  # 获取当前按下的第一个方向键
-    tank.handle_keys(first_pressed_key)  # 根据第一个按下的方向键更新坦克位置和方向
+    tank.tank_move(first_pressed_key)  # 根据第一个按下的方向键更新坦克位置和方向
     tank.clamp_position(screen.get_rect())
 
     # 填充游戏背景颜色，清除屏幕内容
     screen.fill(COLORS["background"])
 
+    # 绘制地图
+    draw_map(screen)
+    
     # 绘制坦克
     tank.draw(screen)
 
