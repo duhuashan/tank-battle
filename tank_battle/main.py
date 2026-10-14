@@ -24,10 +24,10 @@ COLORS = {
 MAP_DATA = [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 1, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1],
     [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
     [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
     [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
@@ -39,7 +39,10 @@ MAP_DATA = [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 ]
 
-BULLET_COOLDOWN = 400
+MAP_ROWS = len(MAP_DATA)
+MAP_COLS = len(MAP_DATA[0])
+BULLET_COOLDOWN = 400  # 子弹发射冷却时间
+TILE_SIZE = 40  # 地图基本格大小
 
 # 初始化 pygame
 pygame.init()
@@ -57,17 +60,32 @@ pygame.display.set_caption("坦克大战")
 clock = pygame.time.Clock()
 
 def draw_map(surface):
-    for row in range(len(MAP_DATA)):
-        for col in range(len(MAP_DATA[row])):
+    for row in range(MAP_ROWS):
+        for col in range(MAP_COLS):
             if MAP_DATA[row][col] == 1:
-                pygame.draw.rect(surface, COLORS["brick_wall"], (col * 40, row * 40, 40, 40))  # 绘制砖墙
+                pygame.draw.rect(surface, COLORS["brick_wall"], (col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE))  # 绘制砖墙
             elif MAP_DATA[row][col] == 2:
-                pygame.draw.rect(surface, COLORS["steel_wall"], (col * 40, row * 40, 40, 40))  # 绘制钢墙
+                pygame.draw.rect(surface, COLORS["steel_wall"], (col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE))  # 绘制钢墙
+
+def collides_with_map(rect):  # 检测矩形是否与地图碰撞
+    top_row = rect.top // TILE_SIZE  # 顶部所在行
+    bottom_row = (rect.bottom - 1) // TILE_SIZE  # 底部所在行（-1 避免刚好压线时多算一行）
+    left_col = rect.left // TILE_SIZE  # 左侧所在列
+    right_col = (rect.right - 1) // TILE_SIZE  # 右侧所在列
+    for row in range(top_row, bottom_row + 1):
+        for col in range(left_col, right_col + 1):
+            if 0 <= row < MAP_ROWS  and 0 <= col < MAP_COLS:
+            # 防止越界：矩形超出地图范围时直接跳过
+                tile = MAP_DATA[row][col]
+                if tile == 1 or tile == 2:
+                    return True  # 发生碰撞
+    return False
 
 # 定义坦克类
 class Tank:
     def __init__(self, x, y):
-        self.rect = pygame.Rect(x, y, 40, 40)
+        self.rect = pygame.Rect(x, y, TILE_SIZE, TILE_SIZE)
+        self.old_rect = self.rect.copy()
         self.speed = 5  # 坦克移动速度
         self.direction = "UP"  # 坦克初始方向为向上
         self.pressed_order = []  # 用于记录按键顺序的列表
@@ -75,6 +93,7 @@ class Tank:
         self.bullets = []  # 坦克自身的子弹列表
 
     def move(self, key):
+        self.old_rect = self.rect.copy()
         if key == pygame.K_UP:
             self.direction = "UP"
             self.rect.y -= self.speed
@@ -89,6 +108,10 @@ class Tank:
             self.rect.x += self.speed
         else:
             pass  # 如果没有按下方向键，则不移动坦克
+
+    def check_collision(self):
+        if collides_with_map(self.rect):
+            self.rect = self.old_rect.copy()
 
     def draw(self, surface):
         if self.direction == "UP":
@@ -137,11 +160,17 @@ class Tank:
             pygame.draw.rect(surface, COLORS["turret_highlight"], (self.rect.right - 31, self.rect.centery - 3, 18, 6))
 
     def update_bullets(self):
+        alive_bullets = []
         for bullet in self.bullets:
             bullet.move()
-        self.bullets[:] = [b for b in self.bullets if not b.is_off_screen(SCREEN_WIDTH, SCREEN_HEIGHT)]
+            if bullet.is_off_screen(SCREEN_WIDTH, SCREEN_HEIGHT):
+                continue  # 出界，丢掉
+            if bullet.hit_wall():
+                continue  # 撞墙，丢掉（地图已改）
+            alive_bullets.append(bullet)
+        self.bullets[:] = alive_bullets
 
-    def draw_tank_bullet(self, surface):
+    def draw_bullet(self, surface):
         for bullet in self.bullets:
             bullet.draw(surface)
 
@@ -165,6 +194,23 @@ class Bullet:
         dx, dy = DIR_VECTORS[self.direction]
         self.rect.x += dx * self.speed
         self.rect.y += dy * self.speed
+
+    def hit_wall(self):  # 子弹是否撞墙
+        top_row = self.rect.top // TILE_SIZE  # 顶部所在行
+        bottom_row = (self.rect.bottom - 1) // TILE_SIZE  # 底部所在行（-1 避免刚好压线时多算一行）
+        left_col = self.rect.left // TILE_SIZE  # 左侧所在列
+        right_col = (self.rect.right - 1) // TILE_SIZE  # 右侧所在列
+        for row in range(top_row, bottom_row + 1):
+            for col in range(left_col, right_col + 1):
+                if 0 <= row < MAP_ROWS and 0 <= col < MAP_COLS:
+                # 防止越界：矩形超出地图范围时直接跳过
+                    tile = MAP_DATA[row][col]
+                    if tile == 1:
+                        MAP_DATA[row][col] = 0
+                        return True
+                    elif tile == 2:
+                        return True
+        return False
 
     def draw(self, surface):
         pygame.draw.rect(surface, COLORS["bullet"], self.rect)
@@ -206,6 +252,7 @@ while running:
     # 更新位置
     first_pressed_key = tank.pressed_order[0] if tank.pressed_order else None  # 获取当前按下的第一个方向键
     tank.move(first_pressed_key)  # 根据第一个按下的方向键更新坦克位置和方向
+    tank.check_collision()
     tank.clamp_position(screen_rect)  # 确保坦克不会移出屏幕边界
     tank.update_bullets()  # 更新坦克子弹位置
 
@@ -215,7 +262,7 @@ while running:
     # 绘制
     draw_map(screen)
     tank.draw(screen)
-    tank.draw_tank_bullet(screen)
+    tank.draw_bullet(screen)
 
     # 更新屏幕显示
     pygame.display.flip()
