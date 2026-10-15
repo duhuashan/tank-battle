@@ -82,6 +82,13 @@ def collides_with_map(rect):
                     return True  # 发生碰撞
     return False
 
+def collides_with_tank(tank, other_tanks):
+    """检测坦克之间的碰撞"""
+    for t in other_tanks:
+        if t is not tank and tank.rect.colliderect(t.rect):
+            return True
+    return False
+
 # 定义坦克类
 class Tank:
     def __init__(self, x, y):
@@ -104,9 +111,9 @@ class Tank:
         self.rect.x += dx * self.speed
         self.rect.y += dy * self.speed
 
-    def check_collision(self, screen_rect):
-        """实现坦克与墙的碰撞，并确保不会越出地图边界"""
-        if collides_with_map(self.rect):
+    def check_collision(self, screen_rect, other_tanks):
+        """实现坦克与墙、地图边界、其他坦克的碰撞"""
+        if collides_with_map(self.rect) or collides_with_tank(self, other_tanks):
             self.rect = self.old_rect.copy()
         self.rect.clamp_ip(screen_rect)
 
@@ -193,10 +200,10 @@ class Enemy_Tank(Tank):
             self.last_turn = ticks
             self.next_turn = random.randint(1000, 3000)
 
-    def check_collision(self, screen_rect):
-        """实现撞墙换向，防止卡墙角"""
+    def check_collision(self, screen_rect, other_tanks):
+        """在父类实现碰撞的基础上，实现撞墙换向，防止卡墙角"""
         temp_rect = self.rect.copy()
-        super().check_collision(screen_rect)
+        super().check_collision(screen_rect, other_tanks)
         if self.rect != temp_rect:
             self.turn()
 
@@ -261,6 +268,7 @@ running = True
 while running:
 
     game_ticks = pygame.time.get_ticks()
+    all_tanks = [tank] + enemies  # 所有坦克的列表
 
     # 处理事件
     for event in pygame.event.get():
@@ -288,12 +296,12 @@ while running:
     # 更新位置
     first_pressed_key = tank.pressed_order[0] if tank.pressed_order else None  # 获取当前按下的第一个方向键
     tank.move(KEY_TO_DIR.get(first_pressed_key))  # 根据第一个按下的方向键更新坦克位置和方向, .get 安全取值：没按方向键时返回 None，避免 KeyError
-    tank.check_collision(screen_rect)  # 确保坦克不会越过墙、超出边界
+    tank.check_collision(screen_rect, all_tanks)  # 确保坦克不会越过墙、超出边界
     tank.update_bullets()  # 更新坦克子弹位置
     for e in enemies:
         e.maybe_turn(game_ticks)
         e.move(e.direction)
-        e.check_collision(screen_rect)
+        e.check_collision(screen_rect, all_tanks)
         e.shoot(game_ticks)
         e.update_bullets()
 
