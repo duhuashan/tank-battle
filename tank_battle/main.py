@@ -1,12 +1,11 @@
 import pygame
+import random
 
-DIR_KEYS = (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT)  # 定义方向键的元组，用于检测按键顺序
-DIR_VECTORS = {
-    "UP": (0, -1),
-    "DOWN": (0, 1),
-    "LEFT": (-1, 0),
-    "RIGHT": (1, 0),
-}
+DIR_KEYS = (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT)  # 定义按下方向键的元组，用于检测按键顺序
+DIR_VECTORS = {"UP": (0, -1), "DOWN": (0, 1), "LEFT": (-1, 0), "RIGHT": (1, 0),}  #定义不同方向的位移(dx, dy)
+DIR_NAMES = tuple(DIR_VECTORS.keys())  # ("UP", "DOWN", "LEFT", "RIGHT")
+KEY_TO_DIR = {pygame.K_UP: "UP", pygame.K_DOWN: "DOWN",
+              pygame.K_LEFT: "LEFT", pygame.K_RIGHT: "RIGHT"}  # 按下方向键状态到按键的对应
 COLORS = {
     "background": (0, 0, 0),  # 游戏背景颜色
     "track": (50, 50, 50),  #坦克履带颜色
@@ -41,7 +40,7 @@ MAP_DATA = [
 
 MAP_ROWS = len(MAP_DATA)
 MAP_COLS = len(MAP_DATA[0])
-BULLET_COOLDOWN = 400  # 子弹发射冷却时间
+SHOT_COOLDOWN = 400  # 攻击冷却时间
 TILE_SIZE = 40  # 地图基本格大小
 
 # 初始化 pygame
@@ -60,6 +59,7 @@ pygame.display.set_caption("坦克大战")
 clock = pygame.time.Clock()
 
 def draw_map(surface):
+    """绘制地图"""
     for row in range(MAP_ROWS):
         for col in range(MAP_COLS):
             if MAP_DATA[row][col] == 1:
@@ -67,7 +67,8 @@ def draw_map(surface):
             elif MAP_DATA[row][col] == 2:
                 pygame.draw.rect(surface, COLORS["steel_wall"], (col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE))  # 绘制钢墙
 
-def collides_with_map(rect):  # 检测矩形是否与地图碰撞
+def collides_with_map(rect):
+    """检测矩形是否与地图碰撞"""
     top_row = rect.top // TILE_SIZE  # 顶部所在行
     bottom_row = (rect.bottom - 1) // TILE_SIZE  # 底部所在行（-1 避免刚好压线时多算一行）
     left_col = rect.left // TILE_SIZE  # 左侧所在列
@@ -88,32 +89,29 @@ class Tank:
         self.old_rect = self.rect.copy()
         self.speed = 5  # 坦克移动速度
         self.direction = "UP"  # 坦克初始方向为向上
-        self.pressed_order = []  # 用于记录按键顺序的列表
-        self.last_shot = 0
-        self.bullets = []  # 坦克自身的子弹列表
+        self.pressed_order = []  # 记录按下方向键的顺序列表
+        self.last_shoot = 0  # 上次攻击的时间
+        self.shoot_cooldown = SHOT_COOLDOWN  # 射击冷却时间
+        self.bullets = []  # 坦克的子弹列表
 
-    def move(self, key):
+    def move(self, direction):
+        """实现坦克的移动"""
         self.old_rect = self.rect.copy()
-        if key == pygame.K_UP:
-            self.direction = "UP"
-            self.rect.y -= self.speed
-        elif key == pygame.K_DOWN:
-            self.direction = "DOWN"
-            self.rect.y += self.speed
-        elif key == pygame.K_LEFT:
-            self.direction = "LEFT"
-            self.rect.x -= self.speed
-        elif key == pygame.K_RIGHT:
-            self.direction = "RIGHT"
-            self.rect.x += self.speed
-        else:
-            pass  # 如果没有按下方向键，则不移动坦克
+        if direction is None:
+            return
+        self.direction = direction
+        dx, dy = DIR_VECTORS[direction]
+        self.rect.x += dx * self.speed
+        self.rect.y += dy * self.speed
 
-    def check_collision(self):
+    def check_collision(self, screen_rect):
+        """实现坦克与墙的碰撞，并确保不会越出地图边界"""
         if collides_with_map(self.rect):
             self.rect = self.old_rect.copy()
+        self.rect.clamp_ip(screen_rect)
 
     def draw(self, surface):
+        """实现坦克的绘制"""
         if self.direction == "UP":
             pygame.draw.rect(surface, COLORS["track"], (self.rect.left, self.rect.top + 4, 10, 36))
             pygame.draw.rect(surface, COLORS["track"], (self.rect.right - 10, self.rect.top + 4, 10, 36))
@@ -160,6 +158,7 @@ class Tank:
             pygame.draw.rect(surface, COLORS["turret_highlight"], (self.rect.right - 31, self.rect.centery - 3, 18, 6))
 
     def update_bullets(self):
+        """更新还存活子弹，移除应该被销毁的子弹"""
         alive_bullets = []
         for bullet in self.bullets:
             bullet.move()
@@ -171,11 +170,42 @@ class Tank:
         self.bullets[:] = alive_bullets
 
     def draw_bullet(self, surface):
+        """实现坦克子弹的绘制"""
         for bullet in self.bullets:
             bullet.draw(surface)
 
-    def clamp_position(self, screen_rect):
-        self.rect.clamp_ip(screen_rect)  # 确保坦克不会移出屏幕边界
+class Enemy_Tank(Tank):
+    def __init__(self, x, y):
+        super().__init__(x, y)
+        self.direction = random.choice(DIR_NAMES)  # 初始朝向随机
+        self.last_turn = 0  # 上次转向的时间点
+        self.next_turn = 1000  # 下次换向的时间间隔（毫秒）
+        self.next_shoot = 1000  #下次射击的间隔时间
+
+    def turn(self):
+        """立刻换一个不同方向（不受计时器限制）"""
+        self.direction = random.choice([d for d in DIR_NAMES if d != self.direction])
+
+    def maybe_turn(self, ticks):
+        """定时随机换向（到点了才换）"""
+        if ticks - self.last_turn >= self.next_turn:
+            self.turn()
+            self.last_turn = ticks
+            self.next_turn = random.randint(1000, 3000)
+
+    def check_collision(self, screen_rect):
+        """实现撞墙换向，防止卡墙角"""
+        temp_rect = self.rect.copy()
+        super().check_collision(screen_rect)
+        if self.rect != temp_rect:
+            self.turn()
+
+    def shoot(self, ticks):
+        """实现敌方坦克的随机射击"""
+        if ticks - self.last_shoot >= self.next_shoot:
+            self.bullets.append(Bullet(self.rect, self.direction))
+            self.last_shoot = ticks
+            self.next_shoot = random.randint(800, 2500)
 
 class Bullet:
     def __init__(self, tank_rect, direction):
@@ -222,6 +252,8 @@ class Bullet:
 # 创建一个坦克实例，初始位置在屏幕中心
 tank = Tank(360, 280)
 
+enemies = [Enemy_Tank(40, 40), Enemy_Tank(720, 40), Enemy_Tank(40, 520)]
+
 # 设置游戏循环状态
 running = True
 
@@ -232,29 +264,38 @@ while running:
 
     # 处理事件
     for event in pygame.event.get():
-        if event.type == pygame.QUIT:
+        if event.type == pygame.QUIT:  # 点击窗口关闭按钮结束程序
             running = False
-        elif event.type == pygame.KEYDOWN:
+        elif event.type == pygame.KEYDOWN:  # 检测按下按键事件
+            # 方向键按下：按先后顺序记录，先按的优先；not in 防止键盘重复连发
             if event.key in DIR_KEYS:
                 if event.key not in tank.pressed_order:
-                    tank.pressed_order.append(event.key)  # 按键按下时记录按键顺序
-            if event.key == pygame.K_SPACE and game_ticks - tank.last_shot >= BULLET_COOLDOWN:
+                    tank.pressed_order.append(event.key)
+            # 空格开火：冷却结束才发射子弹，并刷新上次开火时间
+            if event.key == pygame.K_SPACE and game_ticks - tank.last_shoot >= tank.shoot_cooldown:
                 tank.bullets.append(Bullet(tank.rect, tank.direction))
-                tank.last_shot = game_ticks
-        elif event.type == pygame.KEYUP:
+                tank.last_shoot = game_ticks
+        elif event.type == pygame.KEYUP:  # 检测抬起按键事件
+            # 松开方向键时从 pressed_order 按“先按先移除”的顺序移除
             if event.key in DIR_KEYS:
                 if event.key in tank.pressed_order:
-                    tank.pressed_order.remove(event.key)  # 按键释放时从按键顺序中移除
+                    tank.pressed_order.remove(event.key)
+    # 按下 Ctrl + W 时退出游戏
     keys = pygame.key.get_pressed()
     if keys[pygame.K_LCTRL] and keys[pygame.K_w]:
-        running = False  # 按下 Ctrl + W 时退出游戏
+        running = False
 
     # 更新位置
     first_pressed_key = tank.pressed_order[0] if tank.pressed_order else None  # 获取当前按下的第一个方向键
-    tank.move(first_pressed_key)  # 根据第一个按下的方向键更新坦克位置和方向
-    tank.check_collision()
-    tank.clamp_position(screen_rect)  # 确保坦克不会移出屏幕边界
+    tank.move(KEY_TO_DIR.get(first_pressed_key))  # 根据第一个按下的方向键更新坦克位置和方向, .get 安全取值：没按方向键时返回 None，避免 KeyError
+    tank.check_collision(screen_rect)  # 确保坦克不会越过墙、超出边界
     tank.update_bullets()  # 更新坦克子弹位置
+    for e in enemies:
+        e.maybe_turn(game_ticks)
+        e.move(e.direction)
+        e.check_collision(screen_rect)
+        e.shoot(game_ticks)
+        e.update_bullets()
 
     # 填充游戏背景颜色，清除屏幕内容
     screen.fill(COLORS["background"])
@@ -262,6 +303,9 @@ while running:
     # 绘制
     draw_map(screen)
     tank.draw(screen)
+    for e in enemies:
+        e.draw(screen)
+        e.draw_bullet(screen)
     tank.draw_bullet(screen)
 
     # 更新屏幕显示
