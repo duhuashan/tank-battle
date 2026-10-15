@@ -82,13 +82,41 @@ def collides_with_map(rect):
                     return True  # 发生碰撞
     return False
 
-def collides_with_tank(tank, other_tanks):
+def collides_with_tank(tank, tanks):
     """检测坦克之间的碰撞"""
-    for t in other_tanks:
+    for t in tanks:
         if t is not tank and tank.rect.colliderect(t.rect):
             return True
     return False
 
+def handle_hits():
+    """处理子弹命中坦克"""
+    global score, lives
+    # 玩家子弹击中敌方坦克
+    for e in enemies[:]:
+        hit = None
+        for b in tank.bullets:
+            if b.rect.colliderect(e.rect):
+                hit = b
+                break
+        if hit is not None:
+            enemies.remove(e)
+            tank.bullets.remove(hit)
+            e.bullets.clear()
+            score += 100
+    # 敌方子弹击中敌方坦克、玩家坦克
+    for e in enemies:
+        for b in e.bullets[:]:
+            # 打到玩家
+            if b.rect.colliderect(tank.rect):
+                e.bullets.remove(b)
+                lives -= 1
+                continue
+            # 打到其他敌人
+            for other in enemies:
+                if other is not e and b.rect.colliderect(other.rect):
+                    e.bullets.remove(b)
+                    break
 # 定义坦克类
 class Tank:
     def __init__(self, x, y):
@@ -111,9 +139,9 @@ class Tank:
         self.rect.x += dx * self.speed
         self.rect.y += dy * self.speed
 
-    def check_collision(self, screen_rect, other_tanks):
+    def check_collision(self, screen_rect, tanks):
         """实现坦克与墙、地图边界、其他坦克的碰撞"""
-        if collides_with_map(self.rect) or collides_with_tank(self, other_tanks):
+        if collides_with_map(self.rect) or collides_with_tank(self, tanks):
             self.rect = self.old_rect.copy()
         self.rect.clamp_ip(screen_rect)
 
@@ -200,10 +228,10 @@ class Enemy_Tank(Tank):
             self.last_turn = ticks
             self.next_turn = random.randint(1000, 3000)
 
-    def check_collision(self, screen_rect, other_tanks):
+    def check_collision(self, screen_rect, tanks):
         """在父类实现碰撞的基础上，实现撞墙换向，防止卡墙角"""
         temp_rect = self.rect.copy()
-        super().check_collision(screen_rect, other_tanks)
+        super().check_collision(screen_rect, tanks)
         if self.rect != temp_rect:
             self.turn()
 
@@ -232,7 +260,8 @@ class Bullet:
         self.rect.x += dx * self.speed
         self.rect.y += dy * self.speed
 
-    def hit_wall(self):  # 子弹是否撞墙
+    def hit_wall(self):
+        """实现子弹击中墙的效果，并返回布尔值判断子弹是否应该被清除"""
         top_row = self.rect.top // TILE_SIZE  # 顶部所在行
         bottom_row = (self.rect.bottom - 1) // TILE_SIZE  # 底部所在行（-1 避免刚好压线时多算一行）
         left_col = self.rect.left // TILE_SIZE  # 左侧所在列
@@ -258,6 +287,9 @@ class Bullet:
 
 # 创建一个坦克实例，初始位置在屏幕中心
 tank = Tank(360, 280)
+score = 0  # 得分
+lives = 3  # 剩余生命
+last_score, last_lives = score, lives
 
 enemies = [Enemy_Tank(40, 40), Enemy_Tank(720, 40), Enemy_Tank(40, 520)]
 
@@ -304,6 +336,7 @@ while running:
         e.check_collision(screen_rect, all_tanks)
         e.shoot(game_ticks)
         e.update_bullets()
+    handle_hits()
 
     # 填充游戏背景颜色，清除屏幕内容
     screen.fill(COLORS["background"])
@@ -318,6 +351,9 @@ while running:
 
     # 更新屏幕显示
     pygame.display.flip()
+    if score != last_score or lives != last_lives:
+        print(f"score={score}  lives={lives}  enemies={len(enemies)}")
+        last_score, last_lives = score, lives
 
     # 设置游戏帧率
     clock.tick(60)
