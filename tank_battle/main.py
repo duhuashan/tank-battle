@@ -20,7 +20,7 @@ COLORS = {
 
     "bullet": (255, 255, 255),  #子弹颜色
 }
-MAP_DATA = [
+MAP_1 = [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
     [1, 0, 1, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1],
@@ -38,6 +38,7 @@ MAP_DATA = [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 ]
 
+MAP_DATA = [row[:] for row in MAP_1]
 MAP_ROWS = len(MAP_DATA)
 MAP_COLS = len(MAP_DATA[0])
 SHOT_COOLDOWN = 400  # 攻击冷却时间
@@ -48,6 +49,8 @@ pygame.init()
 # 初始化字体
 pygame.font.init()
 HUD_FONT = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 24)
+TITLE_FONT = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 64)
+INFO_FONT = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 32)
 HUD_COLOR = (255, 255, 255)
 
 # 设置窗口大小
@@ -58,6 +61,11 @@ screen_rect = screen.get_rect()
 
 # 设置窗口标题
 pygame.display.set_caption("坦克大战")
+
+# 结算画面的半透明黑色遮罩
+OVERLAY = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+OVERLAY.fill((0, 0, 0))
+OVERLAY.set_alpha(170)
 
 # 设置游戏时钟
 clock = pygame.time.Clock()
@@ -128,7 +136,50 @@ def draw_hud(surface):
     life_surface = HUD_FONT.render(f"剩余生命  {lives}", True, HUD_COLOR)
     surface.blit(score_surface, score_surface.get_rect(topright=(SCREEN_WIDTH -  10, 10)))
     surface.blit(life_surface, life_surface.get_rect(topright = (SCREEN_WIDTH -10, 40)))
-    
+
+def check_game_over():
+    """检查本局是否结束；结束则把状态切成 over"""
+    global game_state, result_title, result_sub
+    if lives <= 0:
+        game_state = "over"
+        result_title = "游戏结束"
+        result_sub = "生命耗尽"
+        return "lose"
+    if not enemies:
+        game_state = "over"
+        result_title = "胜利！"
+        result_sub = "敌人已全部消灭"
+        return "win"
+    return None
+
+def reset_game():
+    """重开一局：地图、坦克、敌人、分数、生命全部回到初始状态"""
+    global tank, enemies, score, lives, game_state, result_title, result_sub
+    score = 0
+    lives = 3
+    game_state = "playing"
+    result_title = ""
+    result_sub = ""
+    MAP_DATA[:] = [row[:] for row in MAP_1]   # 切片赋值：原地改，不需要 global
+    tank = Tank(360, 280)
+    enemies = [Enemy_Tank(40, 40), Enemy_Tank(720, 40), Enemy_Tank(40, 520)]
+    now = pygame.time.get_ticks()
+    for e in enemies:
+        e.last_shoot = now
+        e.last_turn = now
+
+def draw_result(surface):
+    """结算画面：遮罩 + 标题 + 说明 + 最终得分 + 重开提示"""
+    surface.blit(OVERLAY, (0, 0))
+    for font, text, cy in [
+        (TITLE_FONT, result_title, 240),
+        (INFO_FONT, result_sub, 330),
+        (INFO_FONT, f"最终得分  {score}", 385),
+        (INFO_FONT, "按 R 重新开始", 460),
+    ]:
+        surf = font.render(text, True, HUD_COLOR)
+        surface.blit(surf, surf.get_rect(center=(SCREEN_WIDTH // 2, cy)))
+
 # 定义坦克类
 class Tank:
     def __init__(self, x, y):
@@ -304,10 +355,14 @@ lives = 3  # 剩余生命
 
 enemies = [Enemy_Tank(40, 40), Enemy_Tank(720, 40), Enemy_Tank(40, 520)]
 
-# 设置游戏循环状态
+# 游戏状态：playing = 正在玩，over = 结算画面
+game_state = "playing"
+result_title = ""
+result_sub = ""
+# 设置程序循环状态
 running = True
 
-# 游戏循环
+# 程序循环
 while running:
 
     game_ticks = pygame.time.get_ticks()
@@ -318,6 +373,10 @@ while running:
         if event.type == pygame.QUIT:  # 点击窗口关闭按钮结束程序
             running = False
         elif event.type == pygame.KEYDOWN:  # 检测按下按键事件
+            # 结算画面按 R 重开一局
+            if event.key == pygame.K_r and game_state == "over":
+                reset_game()
+                continue
             # 方向键按下：按先后顺序记录，先按的优先；not in 防止键盘重复连发
             if event.key in DIR_KEYS:
                 if event.key not in tank.pressed_order:
@@ -337,17 +396,19 @@ while running:
         running = False
 
     # 更新位置
-    first_pressed_key = tank.pressed_order[0] if tank.pressed_order else None  # 获取当前按下的第一个方向键
-    tank.move(KEY_TO_DIR.get(first_pressed_key))  # 根据第一个按下的方向键更新坦克位置和方向, .get 安全取值：没按方向键时返回 None，避免 KeyError
-    tank.check_collision(screen_rect, all_tanks)  # 确保坦克不会越过墙、超出边界
-    tank.update_bullets()  # 更新坦克子弹位置
-    for e in enemies:
-        e.maybe_turn(game_ticks)
-        e.move(e.direction)
-        e.check_collision(screen_rect, all_tanks)
-        e.shoot(game_ticks)
-        e.update_bullets()
-    handle_hits()
+    if game_state == "playing":
+        first_pressed_key = tank.pressed_order[0] if tank.pressed_order else None  # 获取当前按下的第一个方向键
+        tank.move(KEY_TO_DIR.get(first_pressed_key))  # 根据第一个按下的方向键更新坦克位置和方向, .get 安全取值：没按方向键时返回 None，避免 KeyError
+        tank.check_collision(screen_rect, all_tanks)  # 确保坦克不会越过墙、超出边界
+        tank.update_bullets()  # 更新坦克子弹位置
+        for e in enemies:
+            e.maybe_turn(game_ticks)
+            e.move(e.direction)
+            e.check_collision(screen_rect, all_tanks)
+            e.shoot(game_ticks)
+            e.update_bullets()
+        handle_hits()
+        check_game_over()
 
     # 填充游戏背景颜色，清除屏幕内容
     screen.fill(COLORS["background"])
@@ -360,6 +421,8 @@ while running:
         e.draw_bullet(screen)
     tank.draw_bullet(screen)
     draw_hud(screen)
+    if game_state == "over":
+        draw_result(screen)
 
     # 更新屏幕显示
     pygame.display.flip()
