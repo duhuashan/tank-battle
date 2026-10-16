@@ -45,6 +45,10 @@ TILE_SIZE = 40  # 地图基本格大小
 
 # 初始化 pygame
 pygame.init()
+# 初始化字体
+pygame.font.init()
+HUD_FONT = pygame.font.Font("C:/Windows/Fonts/simhei.ttf", 24)
+HUD_COLOR = (255, 255, 255)
 
 # 设置窗口大小
 SCREEN_WIDTH = 800
@@ -117,6 +121,14 @@ def handle_hits():
                 if other is not e and b.rect.colliderect(other.rect):
                     e.bullets.remove(b)
                     break
+
+def draw_hud(surface):
+    """实现在右上角绘制分数和剩余生命"""
+    score_surface = HUD_FONT.render(f"分数  {score}", True, HUD_COLOR)
+    life_surface = HUD_FONT.render(f"剩余生命  {lives}", True, HUD_COLOR)
+    surface.blit(score_surface, score_surface.get_rect(topright=(SCREEN_WIDTH -  10, 10)))
+    surface.blit(life_surface, life_surface.get_rect(topright = (SCREEN_WIDTH -10, 40)))
+    
 # 定义坦克类
 class Tank:
     def __init__(self, x, y):
@@ -289,7 +301,6 @@ class Bullet:
 tank = Tank(360, 280)
 score = 0  # 得分
 lives = 3  # 剩余生命
-last_score, last_lives = score, lives
 
 enemies = [Enemy_Tank(40, 40), Enemy_Tank(720, 40), Enemy_Tank(40, 520)]
 
@@ -348,12 +359,10 @@ while running:
         e.draw(screen)
         e.draw_bullet(screen)
     tank.draw_bullet(screen)
+    draw_hud(screen)
 
     # 更新屏幕显示
     pygame.display.flip()
-    if score != last_score or lives != last_lives:
-        print(f"score={score}  lives={lives}  enemies={len(enemies)}")
-        last_score, last_lives = score, lives
 
     # 设置游戏帧率
     clock.tick(60)
