@@ -149,8 +149,9 @@ def run():
                         tank.pressed_order.append(event.key)
                 # 空格开火：冷却结束才发射子弹，并刷新上次开火时间
                 if event.key == pygame.K_SPACE and game_ticks - tank.last_shoot >= tank.shoot_cooldown:
-                    tank.bullets.append(Bullet(tank.rect, tank.direction))
-                    tank.last_shoot = game_ticks
+                    if game_state == "playing":  # 修复结算期间玩家还能发射子弹的问题
+                        tank.bullets.append(Bullet(tank.rect, tank.direction))
+                        tank.last_shoot = game_ticks
             elif event.type == pygame.KEYUP:  # 检测抬起按键事件
                 # 松开方向键时从 pressed_order 按“先按先移除”的顺序移除
                 if event.key in DIR_KEYS:
